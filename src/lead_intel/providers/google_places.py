@@ -20,11 +20,12 @@ from typing import Any
 
 import httpx
 
-from lead_intel.core.exceptions import ProviderAuthError, ProviderError, RateLimitError
+from lead_intel.core.exceptions import ProviderError
 from lead_intel.core.logging import get_logger
 from lead_intel.domain.enums import DataProvider
 from lead_intel.domain.models import Business, BusinessContact, BusinessRatings, GeoLocation
 from lead_intel.providers.base import BusinessProvider, SearchQuery
+from lead_intel.providers.http import request_with_retries
 
 logger = get_logger("providers.google_places")
 
@@ -113,60 +114,14 @@ class GooglePlacesProvider(BusinessProvider):
             "X-Goog-FieldMask": _FIELD_MASK,
         }
 
-        attempt = 0
-        while True:
-            try:
-                response = self._client.post(_ENDPOINT, json=body, headers=headers)
-            except httpx.RequestError as exc:
-                if attempt >= self._max_retries:
-                    raise ProviderError(
-                        f"Network error contacting Google Places: {exc}",
-                        provider="google_places",
-                    ) from exc
-                self._backoff(attempt)
-                attempt += 1
-                continue
-
-            error = self._error_for(response)
-            if error is None:
-                data: dict[str, Any] = response.json()
-                return data
-
-            # Retry only transient errors (rate limit / 5xx); fail fast otherwise.
-            transient = isinstance(error, RateLimitError) or (500 <= response.status_code < 600)
-            if transient and attempt < self._max_retries:
-                wait = getattr(error, "retry_after", None)
-                self._backoff(attempt, override=wait)
-                attempt += 1
-                continue
-            raise error
-
-    @staticmethod
-    def _error_for(response: httpx.Response) -> ProviderError | None:
-        """Translate a non-2xx response into a platform exception (or ``None``)."""
-        if response.is_success:
-            return None
-        message = _extract_error_message(response)
-        if response.status_code in (401, 403):
-            return ProviderAuthError(message, provider="google_places")
-        if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            return RateLimitError(
-                message,
-                provider="google_places",
-                retry_after=float(retry_after) if retry_after else None,
-            )
-        return ProviderError(
-            f"HTTP {response.status_code}: {message}", provider="google_places"
+        response = request_with_retries(
+            lambda: self._client.post(_ENDPOINT, json=body, headers=headers),
+            provider="google_places",
+            max_retries=self._max_retries,
+            sleep=self._sleep,
         )
-
-    def _backoff(self, attempt: int, *, override: float | None = None) -> None:
-        delay = override if override is not None else min(2.0 ** attempt, 30.0)
-        logger.warning(
-            "retrying google places request",
-            extra={"attempt": attempt + 1, "delay_seconds": delay},
-        )
-        self._sleep(delay)
+        data: dict[str, Any] = response.json()
+        return data
 
     # -- Mapping ------------------------------------------------------------
 
@@ -219,16 +174,3 @@ class GooglePlacesProvider(BusinessProvider):
 
     def __exit__(self, *exc: object) -> None:
         self.close()
-
-
-def _extract_error_message(response: httpx.Response) -> str:
-    """Pull a human-readable message from a Google error payload, if present."""
-    try:
-        data = response.json()
-    except ValueError:
-        return response.text or "unknown error"
-    if isinstance(data, dict):
-        error = data.get("error")
-        if isinstance(error, dict) and error.get("message"):
-            return str(error["message"])
-    return response.text or "unknown error"

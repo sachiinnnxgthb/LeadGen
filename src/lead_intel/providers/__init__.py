@@ -6,6 +6,7 @@ factory from here; concrete providers stay implementation details.
 
 from __future__ import annotations
 
+from lead_intel.providers.apify_gmaps import ApifyGoogleMapsProvider
 from lead_intel.providers.base import BusinessProvider, SearchQuery
 from lead_intel.providers.factory import create_provider
 from lead_intel.providers.google_places import GooglePlacesProvider
@@ -15,4 +16,5 @@ __all__ = [
     "SearchQuery",
     "create_provider",
     "GooglePlacesProvider",
+    "ApifyGoogleMapsProvider",
 ]

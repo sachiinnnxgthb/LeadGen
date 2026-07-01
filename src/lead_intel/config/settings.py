@@ -145,6 +145,8 @@ class Settings(BaseSettings):
     default_provider: DataProvider = DataProvider.GOOGLE_PLACES
     google_places_api_key: str = ""
     apify_api_token: str = ""
+    # Apify actor to run; path form uses "~" for the username/name separator.
+    apify_actor_id: str = "compass~crawler-google-places"
 
     llm_provider: str = "anthropic"
     anthropic_api_key: str = ""

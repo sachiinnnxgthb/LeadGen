@@ -16,7 +16,7 @@ city in India (and beyond).
 |-------|-------|-------|
 | **1** | Architecture, folder structure, configuration, domain models | ✅ **Complete** |
 | **2** | Provider abstraction + Google Places integration | ✅ **Complete** |
-| 3 | Apify Google Maps provider | ⏳ Planned |
+| **3** | Apify Google Maps provider | ✅ **Complete** |
 | 4 | Website audit engine (reachability, HTTPS, features, heuristics) | ⏳ Planned |
 | 5 | Scoring services (Website Score 0-100, Lead Score 0-10, package recommendation) | ⏳ Planned |
 | 6 | AI content generation (centralized prompts, provider-agnostic LLM) | ⏳ Planned |
@@ -39,7 +39,7 @@ src/lead_intel/
 │   └── models/
 ├── config/        # Typed settings loaded & validated from .env
 ├── core/          # Cross-cutting: structured logging, exception hierarchy
-├── providers/     # BusinessProvider interface + Google Places + factory
+├── providers/     # BusinessProvider interface + Google Places + Apify + factory
 │   (later) services/  audit/  ai/  exporters/  ui/
 ```
 
