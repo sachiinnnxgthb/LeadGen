@@ -15,7 +15,7 @@ city in India (and beyond).
 | Phase | Scope | State |
 |-------|-------|-------|
 | **1** | Architecture, folder structure, configuration, domain models | ✅ **Complete** |
-| 2 | Provider abstraction + Google Places integration | ⏳ Planned |
+| **2** | Provider abstraction + Google Places integration | ✅ **Complete** |
 | 3 | Apify Google Maps provider | ⏳ Planned |
 | 4 | Website audit engine (reachability, HTTPS, features, heuristics) | ⏳ Planned |
 | 5 | Scoring services (Website Score 0-100, Lead Score 0-10, package recommendation) | ⏳ Planned |
@@ -39,7 +39,8 @@ src/lead_intel/
 │   └── models/
 ├── config/        # Typed settings loaded & validated from .env
 ├── core/          # Cross-cutting: structured logging, exception hierarchy
-│   (later) providers/  services/  audit/  ai/  exporters/  ui/
+├── providers/     # BusinessProvider interface + Google Places + factory
+│   (later) services/  audit/  ai/  exporters/  ui/
 ```
 
 Key principles: SOLID, Repository/Provider pattern for data sources, a Service
