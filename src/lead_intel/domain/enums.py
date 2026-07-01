@@ -103,6 +103,10 @@ class PackageTier(StrEnum):
     GROWTH = "growth"
     PREMIUM = "premium"
 
+    @property
+    def label(self) -> str:
+        return self.value.title()
+
 
 class ContactStatus(StrEnum):
     """CRM outreach state for a lead."""
