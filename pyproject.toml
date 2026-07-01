@@ -20,6 +20,9 @@ dependencies = [
     "httpx>=0.26",
     # HTML parsing for the website audit feature detector (stdlib html.parser).
     "beautifulsoup4>=4.12",
+    # Exporters: Excel CRM/dashboard workbooks and PDF audit reports.
+    "openpyxl>=3.1",
+    "reportlab>=4.0",
     # Lets Pydantic evaluate PEP 604 (`X | None`) annotations at runtime on
     # Python 3.9/3.10. Drop once the minimum runtime is >= 3.11.
     "eval-type-backport>=0.2; python_version < '3.11'",
@@ -63,7 +66,7 @@ warn_unused_ignores = true
 disallow_untyped_defs = true
 mypy_path = "src"
 
-# 'anthropic' is an optional extra (ships no type stubs); ignore when absent.
+# Third-party packages without type stubs.
 [[tool.mypy.overrides]]
-module = ["anthropic", "anthropic.*"]
+module = ["anthropic", "anthropic.*", "openpyxl", "openpyxl.*", "reportlab", "reportlab.*", "bs4"]
 ignore_missing_imports = true

@@ -20,7 +20,7 @@ city in India (and beyond).
 | **4** | Website audit engine (reachability, HTTPS, features, heuristics) | ✅ **Complete** |
 | **5** | Scoring services (Website Score 0-100, Lead Score 0-10, package recommendation) | ✅ **Complete** |
 | **6** | AI content generation (centralized prompts, provider-agnostic LLM) | ✅ **Complete** |
-| 7 | Exporters (Excel CRM, dashboard, PDF audits, CSV/JSON) | ⏳ Planned |
+| **7** | Exporters (Excel CRM, dashboard, PDF audits, CSV/JSON) | ✅ **Complete** |
 | 8 | Streamlit application | ⏳ Planned |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design rationale.
@@ -43,7 +43,8 @@ src/lead_intel/
 ├── audit/         # Website audit engine: fetch, features, heuristics, enricher seam
 ├── services/      # Scoring: website score, lead score, package recommendation
 ├── ai/            # Outreach content: centralized prompts, templates + optional Claude
-│   (later) exporters/  ui/
+├── exporters/     # Excel CRM + Dashboard + PDF audits + CSV/JSON (openpyxl, reportlab)
+│   (later) ui/
 ```
 
 Key principles: SOLID, Repository/Provider pattern for data sources, a Service
