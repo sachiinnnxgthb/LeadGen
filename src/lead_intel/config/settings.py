@@ -36,6 +36,10 @@ class AuditSettings(BaseModel):
     request_timeout_seconds: int = Field(default=15, ge=1, le=120)
     slow_response_ms: int = Field(default=3000, ge=100)
     max_retries: int = Field(default=2, ge=0, le=10)
+    # Number of "outdated" heuristic signals required to flag a site as outdated.
+    outdated_signal_threshold: int = Field(default=2, ge=1, le=10)
+    # A copyright year older than this many years counts as a staleness signal.
+    stale_copyright_years: int = Field(default=3, ge=1, le=20)
 
 
 class LeadScoreSettings(BaseModel):

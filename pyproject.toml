@@ -18,6 +18,8 @@ dependencies = [
     "python-dotenv>=1.0",
     # HTTP client for data providers (Phase 2+) and the website audit engine.
     "httpx>=0.26",
+    # HTML parsing for the website audit feature detector (stdlib html.parser).
+    "beautifulsoup4>=4.12",
     # Lets Pydantic evaluate PEP 604 (`X | None`) annotations at runtime on
     # Python 3.9/3.10. Drop once the minimum runtime is >= 3.11.
     "eval-type-backport>=0.2; python_version < '3.11'",
@@ -26,7 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 # Exporters, UI, and AI are wired in later phases. Kept as extras so the
 # domain/config/provider core installs with a minimal footprint.
-audit = ["beautifulsoup4>=4.12", "lxml>=5.0"]
+audit = ["lxml>=5.0"]  # optional faster parser; html.parser is used by default
 export = ["openpyxl>=3.1", "reportlab>=4.0"]
 ui = ["streamlit>=1.31", "pandas>=2.0"]
 dev = [
