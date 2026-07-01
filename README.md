@@ -21,7 +21,7 @@ city in India (and beyond).
 | **5** | Scoring services (Website Score 0-100, Lead Score 0-10, package recommendation) | ✅ **Complete** |
 | **6** | AI content generation (centralized prompts, provider-agnostic LLM) | ✅ **Complete** |
 | **7** | Exporters (Excel CRM, dashboard, PDF audits, CSV/JSON) | ✅ **Complete** |
-| 8 | Streamlit application | ⏳ Planned |
+| **8** | Streamlit application + end-to-end pipeline | ✅ **Complete** |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design rationale.
 
@@ -44,7 +44,8 @@ src/lead_intel/
 ├── services/      # Scoring: website score, lead score, package recommendation
 ├── ai/            # Outreach content: centralized prompts, templates + optional Claude
 ├── exporters/     # Excel CRM + Dashboard + PDF audits + CSV/JSON (openpyxl, reportlab)
-│   (later) ui/
+├── services/pipeline.py  # End-to-end: discover → audit → score → content → leads
+└── ui/            # Streamlit app + testable formatting/download helpers
 ```
 
 Key principles: SOLID, Repository/Provider pattern for data sources, a Service
@@ -69,6 +70,17 @@ ruff check src tests             # lint
 
 > Requires Python 3.9+. On 3.9/3.10 the `eval-type-backport` dependency lets
 > Pydantic evaluate modern `X | None` annotations at runtime.
+
+### Run the Streamlit app
+
+```bash
+pip install -e ".[ui]"           # streamlit + pandas
+streamlit run app.py
+```
+
+Then click **Sample data** to explore the dashboard, table, outreach content, and
+downloads with zero API keys — or fill in a Google Places / Apify key in `.env`
+and click **Generate** to pull real businesses.
 
 ---
 

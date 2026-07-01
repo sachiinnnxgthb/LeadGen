@@ -33,8 +33,7 @@ dependencies = [
 # domain/config/provider core installs with a minimal footprint.
 audit = ["lxml>=5.0"]  # optional faster parser; html.parser is used by default
 ai = ["anthropic>=0.40"]  # optional; template generator works without it
-export = ["openpyxl>=3.1", "reportlab>=4.0"]
-ui = ["streamlit>=1.31", "pandas>=2.0"]
+ui = ["streamlit>=1.31", "pandas>=2.0"]  # Streamlit application
 dev = [
     "pytest>=8.0",
     "pytest-cov>=4.1",
@@ -68,5 +67,12 @@ mypy_path = "src"
 
 # Third-party packages without type stubs.
 [[tool.mypy.overrides]]
-module = ["anthropic", "anthropic.*", "openpyxl", "openpyxl.*", "reportlab", "reportlab.*", "bs4"]
+module = [
+    "anthropic", "anthropic.*",
+    "openpyxl", "openpyxl.*",
+    "reportlab", "reportlab.*",
+    "bs4",
+    "pandas", "pandas.*",
+    "streamlit", "streamlit.*",
+]
 ignore_missing_imports = true
