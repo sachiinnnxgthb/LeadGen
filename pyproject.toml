@@ -29,6 +29,7 @@ dependencies = [
 # Exporters, UI, and AI are wired in later phases. Kept as extras so the
 # domain/config/provider core installs with a minimal footprint.
 audit = ["lxml>=5.0"]  # optional faster parser; html.parser is used by default
+ai = ["anthropic>=0.40"]  # optional; template generator works without it
 export = ["openpyxl>=3.1", "reportlab>=4.0"]
 ui = ["streamlit>=1.31", "pandas>=2.0"]
 dev = [
@@ -61,3 +62,8 @@ strict = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 mypy_path = "src"
+
+# 'anthropic' is an optional extra (ships no type stubs); ignore when absent.
+[[tool.mypy.overrides]]
+module = ["anthropic", "anthropic.*"]
+ignore_missing_imports = true
