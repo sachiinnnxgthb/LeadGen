@@ -1,9 +1,8 @@
-# Streamlit theme + server config (applies locally and on Streamlit Cloud).
+# Streamlit config (applies locally and on Streamlit Cloud).
+# Only the brand accent is set so Streamlit's native light/dark themes both work
+# and stay switchable via the ⋮ menu → Settings → Theme.
 [theme]
-primaryColor = "#1F3A5F"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F2F4F7"
-textColor = "#1a1a1a"
+primaryColor = "#3A6EA5"
 font = "sans serif"
 
 [server]

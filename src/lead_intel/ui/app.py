@@ -74,16 +74,6 @@ _BASE_CSS = """
 </style>
 """
 
-_DARK_CSS = """
-<style>
-  .stApp { background-color:#0e1117; color:#fafafa; }
-  section[data-testid="stSidebar"] { background-color:#161a23; }
-  .lead-card { background:rgba(255,255,255,.03); border-color:rgba(255,255,255,.12); }
-  div[data-testid="stMetric"] {
-      background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.12); }
-</style>
-"""
-
 
 # -- bootstrap -------------------------------------------------------------
 
@@ -105,7 +95,6 @@ def _load_secrets_into_env() -> None:
 def _init_state() -> None:
     st.session_state.setdefault("leads", [])
     st.session_state.setdefault("logs", [])
-    st.session_state.setdefault("dark_mode", False)
 
 
 def _settings() -> Settings:
@@ -138,7 +127,7 @@ def _check_password(settings_password: str | None) -> bool:
 
 def _render_sidebar(settings: Settings) -> None:
     st.sidebar.title("🔍 Lead Intelligence")
-    st.session_state.dark_mode = st.sidebar.toggle("🌙 Dark mode", value=st.session_state.dark_mode)
+    st.sidebar.caption("Tip: switch light/dark via the ⋮ menu → Settings → Theme.")
 
     st.sidebar.header("Search")
     provider_values = [DataProvider.GOOGLE_PLACES.value, DataProvider.APIFY_GMAPS.value]
@@ -346,8 +335,6 @@ def main() -> None:
 
     settings = _settings()
     st.markdown(_BASE_CSS, unsafe_allow_html=True)
-    if st.session_state.dark_mode:
-        st.markdown(_DARK_CSS, unsafe_allow_html=True)
 
     _render_sidebar(settings)
     st.markdown(
