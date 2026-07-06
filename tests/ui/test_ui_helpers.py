@@ -14,7 +14,10 @@ from lead_intel.ui.formatting import (
     TABLE_COLUMNS,
     filter_leads,
     leads_to_dataframe,
+    merge_leads,
     priority_counts,
+    tel_link,
+    whatsapp_link,
 )
 
 
@@ -106,3 +109,45 @@ def test_pdf_zip_contains_one_pdf_per_lead() -> None:
         names = archive.namelist()
     assert len(names) == len(leads)
     assert all(name.endswith(".pdf") for name in names)
+
+
+# -- phone / whatsapp links ------------------------------------------------
+
+
+def test_tel_link_normalizes_indian_number() -> None:
+    assert tel_link("+91 98813 44635") == "tel:+919881344635"
+    assert tel_link("9881344635") == "tel:+919881344635"       # bare 10-digit gets +91
+    assert tel_link("098813 44635") == "tel:+919881344635"      # leading 0 stripped
+    assert tel_link(None) is None
+    assert tel_link("") is None
+
+
+def test_whatsapp_link_builds_wa_me_with_message() -> None:
+    link = whatsapp_link("+91 98813 44635", "Hi there!")
+    assert link is not None
+    assert link.startswith("https://wa.me/919881344635?text=")
+    assert "Hi%20there" in link
+    assert whatsapp_link(None, "x") is None
+
+
+def test_whatsapp_link_without_message() -> None:
+    assert whatsapp_link("9881344635") == "https://wa.me/919881344635"
+
+
+# -- merge / accumulate ----------------------------------------------------
+
+
+def test_merge_leads_deduplicates_and_prefers_new() -> None:
+    leads = _leads()
+    first_two = leads[:2]
+    overlap = [leads[1], leads[2]]  # leads[1] appears in both
+    merged = merge_leads(first_two, overlap)
+    keys = [x.business.dedup_key for x in merged]
+    assert len(keys) == len(set(keys))          # no duplicates
+    assert len(merged) == 3                       # 2 + 2 - 1 overlap
+
+
+def test_merge_leads_sorted_by_score() -> None:
+    merged = merge_leads(_leads(), [])
+    scores = [x.lead_score.value for x in merged if x.lead_score]
+    assert scores == sorted(scores, reverse=True)

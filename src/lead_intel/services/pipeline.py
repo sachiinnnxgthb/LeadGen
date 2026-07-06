@@ -26,12 +26,18 @@ logger = get_logger("services.pipeline")
 
 @dataclass(frozen=True)
 class PipelineConfig:
-    """Parameters for one discovery+enrichment run."""
+    """Parameters for one discovery+enrichment run.
+
+    When ``areas`` is provided, each category is searched once per area (e.g.
+    "gym in Baner", "gym in Kothrud"), which surfaces different businesses than a
+    single city-wide search — the way to broaden coverage beyond the top results.
+    """
 
     categories: list[Industry]
     city: str = "Pune"
     state: str = "Maharashtra"
     country: str = "India"
+    areas: list[str] = field(default_factory=list)
     min_rating: float = 0.0
     min_reviews: int = 0
     max_results_per_category: int = 60
@@ -119,30 +125,32 @@ class LeadPipeline:
     # -- stages ------------------------------------------------------------
 
     def _discover(self, config: PipelineConfig, emit: ProgressCallback) -> list[Business]:
+        # Search each category once per area (or once city-wide if no areas given).
+        areas: list[str | None] = list(config.areas) if config.areas else [None]
+        searches = [(ind, area) for ind in config.categories for area in areas]
         found: list[Business] = []
-        total = len(config.categories)
-        for i, industry in enumerate(config.categories, start=1):
-            emit(ProgressEvent("discover", f"Searching {industry.label}…", i, total))
+        total = len(searches)
+
+        for i, (industry, area) in enumerate(searches, start=1):
+            where = f"{industry.label} in {area}" if area else industry.label
+            emit(ProgressEvent("discover", f"Searching {where}…", i, total))
             query = SearchQuery(
                 industry=industry,
                 city=config.city,
                 state=config.state,
                 country=config.country,
+                area=area,
                 min_rating=config.min_rating,
                 min_reviews=config.min_reviews,
                 max_results=config.max_results_per_category,
             )
             try:
                 results = self._provider.search(query)
-            except Exception as exc:  # noqa: BLE001 - one category failure must not abort
-                logger.warning("discovery failed for %s: %s", industry.label, exc)
-                emit(ProgressEvent(
-                    "discover", f"Failed to search {industry.label}: {exc}", i, total
-                ))
+            except Exception as exc:  # noqa: BLE001 - one search failure must not abort
+                logger.warning("discovery failed for %s: %s", where, exc)
+                emit(ProgressEvent("discover", f"Failed to search {where}: {exc}", i, total))
                 continue
-            emit(ProgressEvent(
-                "discover", f"Found {len(results)} {industry.label} businesses.", i, total
-            ))
+            emit(ProgressEvent("discover", f"Found {len(results)} for {where}.", i, total))
             found.extend(results)
         return found
 

@@ -106,6 +106,24 @@ def test_pipeline_survives_provider_failure() -> None:
     assert result.leads[0].business.name == "Survivor Cafe"
 
 
+def test_pipeline_searches_each_area() -> None:
+    calls: list[tuple[Industry, str | None]] = []
+
+    class RecordingProvider(BusinessProvider):
+        provider = DataProvider.GOOGLE_PLACES
+
+        def _fetch(self, query: SearchQuery) -> list[Business]:
+            calls.append((query.industry, query.area))
+            return [_biz(f"{query.industry.value}-{query.area}", query.industry, area=query.area)]
+
+    config = PipelineConfig(categories=[Industry.GYM], areas=["Baner", "Kothrud"])
+    result = _pipeline(RecordingProvider()).run(config)
+
+    assert (Industry.GYM, "Baner") in calls
+    assert (Industry.GYM, "Kothrud") in calls
+    assert result.discovered == 2  # one per area
+
+
 def test_pipeline_emits_progress() -> None:
     provider = FakeProvider({Industry.GYM: [_biz("A Gym", Industry.GYM)]})
     events: list[ProgressEvent] = []
