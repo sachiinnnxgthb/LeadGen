@@ -124,6 +124,28 @@ def test_pipeline_searches_each_area() -> None:
     assert result.discovered == 2  # one per area
 
 
+def test_pipeline_uses_explicit_searches() -> None:
+    calls: list[tuple[Industry, str | None]] = []
+
+    class RecordingProvider(BusinessProvider):
+        provider = DataProvider.GOOGLE_PLACES
+
+        def _fetch(self, query: SearchQuery) -> list[Business]:
+            calls.append((query.industry, query.area))
+            return [_biz(f"{query.industry.value}-{query.area}", query.industry, area=query.area)]
+
+    # Explicit list overrides the category×area product: only these two combos run.
+    config = PipelineConfig(
+        categories=[Industry.GYM, Industry.CAFE],
+        areas=["Baner", "Kothrud"],
+        searches=[(Industry.GYM, "Baner"), (Industry.CAFE, "Kothrud")],
+    )
+    result = _pipeline(RecordingProvider()).run(config)
+
+    assert set(calls) == {(Industry.GYM, "Baner"), (Industry.CAFE, "Kothrud")}
+    assert result.discovered == 2  # not 4 (would be the full cartesian)
+
+
 def test_pipeline_emits_progress() -> None:
     provider = FakeProvider({Industry.GYM: [_biz("A Gym", Industry.GYM)]})
     events: list[ProgressEvent] = []

@@ -41,6 +41,9 @@ class PipelineConfig:
     min_rating: float = 0.0
     min_reviews: int = 0
     max_results_per_category: int = 60
+    # Optional explicit (industry, area) search list. When set, it overrides the
+    # category×area cartesian product — used to run only not-yet-searched combos.
+    searches: list[tuple[Industry, str | None]] | None = None
 
 
 @dataclass(frozen=True)
@@ -125,9 +128,12 @@ class LeadPipeline:
     # -- stages ------------------------------------------------------------
 
     def _discover(self, config: PipelineConfig, emit: ProgressCallback) -> list[Business]:
-        # Search each category once per area (or once city-wide if no areas given).
-        areas: list[str | None] = list(config.areas) if config.areas else [None]
-        searches = [(ind, area) for ind in config.categories for area in areas]
+        # Use the explicit search list if provided, else the category×area product.
+        if config.searches is not None:
+            searches: list[tuple[Industry, str | None]] = list(config.searches)
+        else:
+            areas: list[str | None] = list(config.areas) if config.areas else [None]
+            searches = [(ind, area) for ind in config.categories for area in areas]
         found: list[Business] = []
         total = len(searches)
 

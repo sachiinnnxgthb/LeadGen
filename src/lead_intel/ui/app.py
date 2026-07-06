@@ -133,6 +133,9 @@ def _init_state() -> None:
     st.session_state.setdefault("leads", [])
     st.session_state.setdefault("logs", [])
     st.session_state.setdefault("dark_mode", False)
+    # (industry_value, area) combos already searched this session — used to skip
+    # re-fetching data the user has already generated.
+    st.session_state.setdefault("searched", set())
 
 
 def _settings() -> Settings:
@@ -196,29 +199,29 @@ def _render_sidebar(settings: Settings) -> None:
         "Minimum reviews", 0, 10000, int(settings.search.min_reviews)
     )
     max_results = st.sidebar.slider("Max results per search", 5, 120, 20, 5)
-    accumulate = st.sidebar.toggle(
-        "➕ Add to existing results", value=False,
-        help="Keep previous results and merge new ones (de-duplicated) instead of replacing.",
-    )
 
     if st.sidebar.button("🚀 Generate", type="primary", use_container_width=True):
-        _run_pipeline(
+        _generate(
             settings,
             provider=DataProvider(provider_label),
-            accumulate=accumulate,
-            config=PipelineConfig(
-                categories=categories or _DEFAULT_CATEGORIES, city=city,
-                areas=[a.strip() for a in areas if a.strip()],
-                min_rating=min_rating, min_reviews=int(min_reviews),
-                max_results_per_category=int(max_results),
-            ),
+            city=city,
+            categories=categories or _DEFAULT_CATEGORIES,
+            areas=[a.strip() for a in areas if a.strip()],
+            min_rating=min_rating,
+            min_reviews=int(min_reviews),
+            max_results=int(max_results),
         )
     if st.sidebar.button("🧪 Sample data", use_container_width=True):
         st.session_state.leads = sample_leads(settings)
+        st.session_state.searched = set()
         st.session_state.logs = ["Loaded sample data."]
     if st.session_state.leads and st.sidebar.button("🗑️ Clear results", use_container_width=True):
         st.session_state.leads = []
+        st.session_state.searched = set()
         st.session_state.logs = []
+    if st.session_state.searched:
+        st.sidebar.caption(f"✅ {len(st.session_state.searched)} area/category searches done "
+                           "this session (re-runs skip these).")
 
     with st.sidebar.expander("⚙️ Settings"):
         llm_mode = "Claude" if settings.anthropic_api_key else "templates"
@@ -227,9 +230,32 @@ def _render_sidebar(settings: Settings) -> None:
         st.caption("Edit `.env` or Streamlit secrets to change keys, agency, and pricing.")
 
 
-def _run_pipeline(
-    settings: Settings, *, provider: DataProvider, config: PipelineConfig, accumulate: bool
+def _generate(
+    settings: Settings,
+    *,
+    provider: DataProvider,
+    city: str,
+    categories: list[Industry],
+    areas: list[str],
+    min_rating: float,
+    min_reviews: int,
+    max_results: int,
 ) -> None:
+    """Run only not-yet-searched (category, area) combos and merge the results."""
+    # Build the requested searches (cartesian of categories × areas, or city-wide).
+    area_list: list[str | None] = list(areas) if areas else [None]
+    requested = [(ind, area) for ind in categories for area in area_list]
+    searched: set[tuple[str, str]] = st.session_state.searched
+    to_run = [(ind, area) for (ind, area) in requested
+              if (ind.value, area or "") not in searched]
+
+    if not to_run:
+        st.sidebar.warning(
+            "You've already generated all selected areas/categories this session. "
+            "Add a new area or category, or tap 🗑️ Clear results to start fresh."
+        )
+        return
+
     st.session_state.logs = []
     progress = st.sidebar.progress(0.0, text="Starting…")
     logs = st.session_state.logs
@@ -240,15 +266,18 @@ def _run_pipeline(
 
     try:
         pipeline = build_pipeline(settings.model_copy(update={"default_provider": provider}))
+        config = PipelineConfig(
+            categories=categories, city=city, searches=to_run,
+            min_rating=min_rating, min_reviews=min_reviews,
+            max_results_per_category=max_results,
+        )
         result = pipeline.run(config, on_progress=on_progress)
-        if accumulate and st.session_state.leads:
-            st.session_state.leads = merge_leads(st.session_state.leads, result.leads)
-        else:
-            st.session_state.leads = result.leads
+        st.session_state.leads = merge_leads(st.session_state.leads, result.leads)
+        searched.update((ind.value, area or "") for (ind, area) in to_run)
+        skipped_combos = len(requested) - len(to_run)
         logs.append(
-            f"Discovered {result.discovered}, deduped to {result.deduplicated}, "
-            f"{len(result.leads)} new leads, {result.skipped} skipped. "
-            f"Total now: {len(st.session_state.leads)}."
+            f"Ran {len(to_run)} searches ({skipped_combos} already-done skipped); "
+            f"{len(result.leads)} new leads. Total now: {len(st.session_state.leads)}."
         )
     except LeadIntelError as exc:
         st.sidebar.error(str(exc))
