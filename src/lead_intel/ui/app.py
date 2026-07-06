@@ -14,6 +14,7 @@ import html
 import os
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from lead_intel.config.settings import Settings
 from lead_intel.core.exceptions import LeadIntelError
@@ -27,6 +28,7 @@ from lead_intel.domain.enums import (
 from lead_intel.domain.models import Lead
 from lead_intel.exporters.export_service import _slugify
 from lead_intel.exporters.screenshot import fetch_screenshot
+from lead_intel.mockup import build_mockup_html
 from lead_intel.services.pipeline import PipelineConfig, ProgressEvent, build_pipeline
 from lead_intel.ui import downloads
 from lead_intel.ui.demo import sample_leads
@@ -447,6 +449,24 @@ def _cached_screenshot(url: str) -> bytes | None:
     return fetch_screenshot(url)
 
 
+def _render_mockup(settings: Settings, leads: list[Lead]) -> None:
+    """Generate a live website mockup for a business — the strongest closing tool."""
+    st.subheader("🎨 Instant website mockup")
+    st.caption("Show a business a preview of *their own* future website — the fastest way to a "
+               "yes. Download the HTML and send it, or screenshot it for WhatsApp.")
+    names = [lead.business.name for lead in leads]
+    choice = st.selectbox("Build a mockup for", names, key="mockup_pick")
+    lead = next(x for x in leads if x.business.name == choice)
+
+    mockup = build_mockup_html(lead, settings.agency)
+    components.html(mockup, height=560, scrolling=True)
+    st.download_button(
+        "⬇️ Download mockup (HTML)", mockup.encode("utf-8"),
+        file_name=f"mockup-{_slugify(lead.business.name)}.html",
+        mime="text/html", use_container_width=True, key="mockup_dl",
+    )
+
+
 def _render_proposal(settings: Settings, leads: list[Lead]) -> None:
     """Pick a lead → preview its current site → download a branded proposal PDF."""
     st.subheader("📄 Proposal generator")
@@ -533,6 +553,7 @@ def main() -> None:
     _render_dashboard(leads)
     _render_downloads(settings, leads)
     _render_leads(leads)
+    _render_mockup(settings, leads)
     _render_proposal(settings, leads)
     _render_workspace(leads)
     _render_logs()

@@ -57,6 +57,10 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM"]
 
+[tool.ruff.lint.per-file-ignores]
+# The mockup builder is a large inline HTML/CSS template — long lines are natural.
+"src/lead_intel/mockup/builder.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.9"
 plugins = ["pydantic.mypy"]
