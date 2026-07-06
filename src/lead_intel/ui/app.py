@@ -89,14 +89,17 @@ _DARK_CSS = """
 
 
 def _load_secrets_into_env() -> None:
-    """Copy Streamlit Cloud secrets into the environment before settings load."""
+    """Copy Streamlit Cloud secrets into the environment before settings load.
+
+    Accessing ``st.secrets`` when no secrets file exists (normal in local dev)
+    raises, so the whole probe is guarded and simply no-ops in that case.
+    """
     try:
-        secrets = st.secrets
-    except Exception:  # noqa: BLE001 - no secrets file present (local dev)
+        for key in _SECRET_KEYS:
+            if key in st.secrets and not os.environ.get(key):
+                os.environ[key] = str(st.secrets[key])
+    except Exception:  # noqa: BLE001 - no secrets file present (local dev): use .env instead
         return
-    for key in _SECRET_KEYS:
-        if key in secrets and not os.environ.get(key):
-            os.environ[key] = str(secrets[key])
 
 
 def _init_state() -> None:
