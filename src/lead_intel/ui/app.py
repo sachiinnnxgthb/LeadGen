@@ -32,8 +32,8 @@ from lead_intel.ui.formatting import (
     whatsapp_link,
 )
 
-# Secret keys copied from st.secrets → env so cloud deploys work without a .env file.
-_SECRET_KEYS = ("APIFY_API_TOKEN", "GOOGLE_PLACES_API_KEY", "ANTHROPIC_API_KEY", "DEFAULT_PROVIDER")
+# All top-level secrets are copied from st.secrets → env so cloud deploys can set
+# anything the .env supports (API keys, provider, agency details, scoring, prices).
 
 _DEFAULT_CATEGORIES = [Industry.GYM, Industry.CAFE, Industry.RESTAURANT, Industry.DENTAL_CLINIC,
                        Industry.SALON, Industry.SPA]
@@ -74,6 +74,35 @@ _BASE_CSS = """
 </style>
 """
 
+_DARK_CSS = """
+<style>
+  .stApp { background-color:#0e1117; color:#fafafa; }
+  [data-testid="stHeader"] { background:rgba(0,0,0,0); }
+  [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
+      background-color:#161a23 !important; }
+  [data-testid="stSidebar"] * { color:#e8e8e8 !important; }
+  h1,h2,h3,h4,h5,h6, .stMarkdown, [data-testid="stWidgetLabel"] *,
+  [data-testid="stMetricLabel"], [data-testid="stMetricValue"],
+  [data-testid="stCaptionContainer"], .stRadio label, .stApp p { color:#fafafa !important; }
+  /* Inputs -> dark so text stays readable */
+  input, textarea, [data-baseweb="base-input"], [data-baseweb="input"] > div,
+  [data-baseweb="select"] > div {
+      background-color:#262730 !important; color:#fafafa !important;
+      -webkit-text-fill-color:#fafafa !important; }
+  input::placeholder, textarea::placeholder { color:#9aa0a6 !important; }
+  /* Cards / metrics on dark */
+  .lead-card { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.14); }
+  div[data-testid="stMetric"] {
+      background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.14); }
+  /* Keep badge text readable on their light chips */
+  .badge-high { color:#0a5d1e !important; }
+  .badge-medium { color:#7a4f00 !important; }
+  .badge-low { color:#333 !important; }
+  .badge-status { color:#eaf0fb !important; }
+  .act-web { color:#fafafa !important; }
+</style>
+"""
+
 
 # -- bootstrap -------------------------------------------------------------
 
@@ -85,9 +114,9 @@ def _load_secrets_into_env() -> None:
     raises, so the whole probe is guarded and simply no-ops in that case.
     """
     try:
-        for key in _SECRET_KEYS:
-            if key in st.secrets and not os.environ.get(key):
-                os.environ[key] = str(st.secrets[key])
+        for key, value in st.secrets.items():
+            if isinstance(value, (str, int, float, bool)) and not os.environ.get(key):
+                os.environ[key] = str(value)
     except Exception:  # noqa: BLE001 - no secrets file present (local dev): use .env instead
         return
 
@@ -95,6 +124,7 @@ def _load_secrets_into_env() -> None:
 def _init_state() -> None:
     st.session_state.setdefault("leads", [])
     st.session_state.setdefault("logs", [])
+    st.session_state.setdefault("dark_mode", False)
 
 
 def _settings() -> Settings:
@@ -127,7 +157,9 @@ def _check_password(settings_password: str | None) -> bool:
 
 def _render_sidebar(settings: Settings) -> None:
     st.sidebar.title("🔍 Lead Intelligence")
-    st.sidebar.caption("Tip: switch light/dark via the ⋮ menu → Settings → Theme.")
+    st.session_state.dark_mode = st.sidebar.toggle(
+        "🌙 Dark mode", value=st.session_state.dark_mode
+    )
 
     st.sidebar.header("Search")
     provider_values = [DataProvider.GOOGLE_PLACES.value, DataProvider.APIFY_GMAPS.value]
@@ -337,6 +369,10 @@ def main() -> None:
     st.markdown(_BASE_CSS, unsafe_allow_html=True)
 
     _render_sidebar(settings)
+    # Inject AFTER the sidebar so the toggle's fresh value is read (no one-click lag).
+    # A global <style> tag styles the whole page regardless of DOM position.
+    if st.session_state.dark_mode:
+        st.markdown(_DARK_CSS, unsafe_allow_html=True)
     st.markdown(
         '<div class="hero"><h1>AI Lead Intelligence</h1>'
         '<p>Find local businesses that need a website — audited, scored, and ready to contact.</p>'
