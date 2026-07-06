@@ -25,6 +25,8 @@ from lead_intel.domain.enums import (
     WebsiteStatus,
 )
 from lead_intel.domain.models import Lead
+from lead_intel.exporters.export_service import _slugify
+from lead_intel.exporters.screenshot import fetch_screenshot
 from lead_intel.services.pipeline import PipelineConfig, ProgressEvent, build_pipeline
 from lead_intel.ui import downloads
 from lead_intel.ui.demo import sample_leads
@@ -190,14 +192,24 @@ def _render_sidebar(settings: Settings) -> None:
     )
     provider_label = st.sidebar.selectbox("Provider", provider_values, index=default_index)
     city = st.sidebar.text_input("City", value=settings.search.city)
-    areas = st.sidebar.multiselect(
-        "Areas (optional — tap to add)",
-        options=_PUNE_AREAS,
-        default=[],
-        accept_new_options=True,
-        help="Tap areas to search each one separately and surface different businesses. "
-             "Leave empty to search the whole city. You can also type a custom area.",
+    sweep_all = st.sidebar.checkbox(
+        "🗺️ Sweep all Pune areas",
+        help="Search every listed Pune locality for maximum coverage. Takes longer and uses "
+             "more Apify credit — already-searched areas are skipped automatically.",
     )
+    if sweep_all:
+        areas = _PUNE_AREAS
+        st.sidebar.caption(f"Will sweep {len(_PUNE_AREAS)} areas × your categories "
+                           "(already-done combos are skipped).")
+    else:
+        areas = st.sidebar.multiselect(
+            "Areas (optional — tap to add)",
+            options=_PUNE_AREAS,
+            default=[],
+            accept_new_options=True,
+            help="Tap areas to search each one separately and surface different businesses. "
+                 "Leave empty to search the whole city. You can also type a custom area.",
+        )
     categories = st.sidebar.multiselect(
         "Categories", options=list(Industry), default=_DEFAULT_CATEGORIES,
         format_func=lambda ind: ind.label,
@@ -429,6 +441,37 @@ def _render_downloads(settings: Settings, leads: list[Lead]) -> None:
                        file_name="audits.zip", mime="application/zip", use_container_width=True)
 
 
+@st.cache_data(show_spinner=False, ttl=3600)
+def _cached_screenshot(url: str) -> bytes | None:
+    """Fetch (and cache for the session) a website screenshot by URL."""
+    return fetch_screenshot(url)
+
+
+def _render_proposal(settings: Settings, leads: list[Lead]) -> None:
+    """Pick a lead → preview its current site → download a branded proposal PDF."""
+    st.subheader("📄 Proposal generator")
+    names = [lead.business.name for lead in leads]
+    choice = st.selectbox("Create a client-ready proposal for", names, key="proposal_pick")
+    lead = next(x for x in leads if x.business.name == choice)
+
+    website = lead.business.contact.website
+    shot = _cached_screenshot(website) if website else None
+    if shot:
+        st.image(shot, caption="Their current website", use_container_width=True)
+    elif website:
+        st.caption("Live preview of their site is still rendering — the proposal will "
+                   "include it if available.")
+    else:
+        st.caption("This business has no website — the proposal pitches a first-ever site.")
+
+    pdf = downloads.proposal_bytes(lead, settings.agency, settings.package, screenshot=shot)
+    st.download_button(
+        "📄 Download proposal (PDF)", pdf,
+        file_name=f"proposal-{_slugify(lead.business.name)}.pdf",
+        mime="application/pdf", use_container_width=True, key="proposal_dl",
+    )
+
+
 def _render_workspace(leads: list[Lead]) -> None:
     """Save the full working set (leads + tracking) to a file, or restore one."""
     with st.expander("💾 Save / restore your work"):
@@ -490,6 +533,7 @@ def main() -> None:
     _render_dashboard(leads)
     _render_downloads(settings, leads)
     _render_leads(leads)
+    _render_proposal(settings, leads)
     _render_workspace(leads)
     _render_logs()
 

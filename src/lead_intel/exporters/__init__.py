@@ -11,6 +11,8 @@ from lead_intel.exporters.analytics import DashboardStats, compute_dashboard
 from lead_intel.exporters.data_exporter import export_csv, export_json
 from lead_intel.exporters.export_service import ExportService, ExportSummary
 from lead_intel.exporters.pdf_exporter import PdfAuditExporter
+from lead_intel.exporters.proposal_exporter import ProposalExporter
+from lead_intel.exporters.screenshot import fetch_screenshot, screenshot_url
 
 __all__ = [
     "DashboardStats",
@@ -20,4 +22,7 @@ __all__ = [
     "ExportService",
     "ExportSummary",
     "PdfAuditExporter",
+    "ProposalExporter",
+    "fetch_screenshot",
+    "screenshot_url",
 ]
