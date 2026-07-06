@@ -38,6 +38,14 @@ from lead_intel.ui.formatting import (
 _DEFAULT_CATEGORIES = [Industry.GYM, Industry.CAFE, Industry.RESTAURANT, Industry.DENTAL_CLINIC,
                        Industry.SALON, Industry.SPA]
 
+# Popular Pune localities offered as tap-to-add chips (custom entries also allowed).
+_PUNE_AREAS = [
+    "Baner", "Aundh", "Wakad", "Hinjewadi", "Kothrud", "Karve Nagar", "Warje", "Bavdhan",
+    "Koregaon Park", "Kalyani Nagar", "Viman Nagar", "Kharadi", "Wagholi", "Hadapsar",
+    "Magarpatta", "Camp", "Deccan", "Shivaji Nagar", "Pimple Saudagar", "Pimpri-Chinchwad",
+    "Katraj", "Kondhwa", "Undri", "NIBM", "Balewadi",
+]
+
 _BASE_CSS = """
 <style>
   .block-container { padding-top: 2rem; max-width: 1100px; }
@@ -169,10 +177,13 @@ def _render_sidebar(settings: Settings) -> None:
     )
     provider_label = st.sidebar.selectbox("Provider", provider_values, index=default_index)
     city = st.sidebar.text_input("City", value=settings.search.city)
-    areas_raw = st.sidebar.text_input(
-        "Areas (optional, comma-separated)",
-        placeholder="Baner, Kothrud, Viman Nagar",
-        help="Search each area separately to find different businesses across the city.",
+    areas = st.sidebar.multiselect(
+        "Areas (optional — tap to add)",
+        options=_PUNE_AREAS,
+        default=[],
+        accept_new_options=True,
+        help="Tap areas to search each one separately and surface different businesses. "
+             "Leave empty to search the whole city. You can also type a custom area.",
     )
     categories = st.sidebar.multiselect(
         "Categories", options=list(Industry), default=_DEFAULT_CATEGORIES,
@@ -191,13 +202,13 @@ def _render_sidebar(settings: Settings) -> None:
     )
 
     if st.sidebar.button("🚀 Generate", type="primary", use_container_width=True):
-        areas = [a.strip() for a in areas_raw.split(",") if a.strip()]
         _run_pipeline(
             settings,
             provider=DataProvider(provider_label),
             accumulate=accumulate,
             config=PipelineConfig(
-                categories=categories or _DEFAULT_CATEGORIES, city=city, areas=areas,
+                categories=categories or _DEFAULT_CATEGORIES, city=city,
+                areas=[a.strip() for a in areas if a.strip()],
                 min_rating=min_rating, min_reviews=int(min_reviews),
                 max_results_per_category=int(max_results),
             ),
