@@ -7,16 +7,19 @@ import json
 import zipfile
 
 from lead_intel.config.settings import Settings
-from lead_intel.domain.enums import LeadPriority, WebsiteStatus
+from lead_intel.domain.enums import ContactStatus, LeadPriority, WebsiteStatus
 from lead_intel.ui import downloads
 from lead_intel.ui.demo import sample_leads
 from lead_intel.ui.formatting import (
     TABLE_COLUMNS,
+    apply_tracking_edits,
     filter_leads,
+    leads_from_json,
     leads_to_dataframe,
     merge_leads,
     priority_counts,
     tel_link,
+    tracking_editor_df,
     whatsapp_link,
 )
 
@@ -151,3 +154,45 @@ def test_merge_leads_sorted_by_score() -> None:
     merged = merge_leads(_leads(), [])
     scores = [x.lead_score.value for x in merged if x.lead_score]
     assert scores == sorted(scores, reverse=True)
+
+
+# -- tracking editor -------------------------------------------------------
+
+
+def test_tracking_editor_df_has_expected_columns() -> None:
+    df = tracking_editor_df(_leads())
+    for col in ("key", "Business", "Phone", "Status", "WhatsApp Sent", "Follow-up", "Notes"):
+        assert col in df.columns
+    assert len(df) == len(_leads())
+
+
+def test_apply_tracking_edits_writes_back() -> None:
+    leads = _leads()
+    df = tracking_editor_df(leads)
+    df.loc[0, "Status"] = "Interested"
+    df.loc[0, "WhatsApp Sent"] = True
+    df.loc[0, "Notes"] = "Called, keen"
+    apply_tracking_edits(leads, df)
+
+    target = next(x for x in leads if x.business.dedup_key == df.loc[0, "key"])
+    assert target.crm.contact_status == ContactStatus.INTERESTED
+    assert target.crm.whatsapp_sent is True
+    assert target.crm.notes == "Called, keen"
+
+
+def test_apply_tracking_edits_ignores_unknown_key() -> None:
+    leads = _leads()
+    df = tracking_editor_df(leads)
+    df.loc[0, "key"] = "nonexistent"
+    apply_tracking_edits(leads, df)  # should not raise
+
+
+def test_workspace_json_roundtrip() -> None:
+    leads = _leads()
+    # Mark some tracking, export, and re-import.
+    leads[0].crm.notes = "roundtrip note"
+    data = downloads.json_bytes(leads)
+    restored = leads_from_json(data)
+    assert len(restored) == len(leads)
+    assert restored[0].crm.notes == "roundtrip note"
+    assert restored[0].business.name == leads[0].business.name

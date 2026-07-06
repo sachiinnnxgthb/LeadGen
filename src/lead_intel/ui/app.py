@@ -17,18 +17,28 @@ import streamlit as st
 
 from lead_intel.config.settings import Settings
 from lead_intel.core.exceptions import LeadIntelError
-from lead_intel.domain.enums import DataProvider, Industry, LeadPriority, WebsiteStatus
+from lead_intel.domain.enums import (
+    ContactStatus,
+    DataProvider,
+    Industry,
+    LeadPriority,
+    WebsiteStatus,
+)
 from lead_intel.domain.models import Lead
 from lead_intel.services.pipeline import PipelineConfig, ProgressEvent, build_pipeline
 from lead_intel.ui import downloads
 from lead_intel.ui.demo import sample_leads
 from lead_intel.ui.formatting import (
+    STATUS_LABELS,
     TABLE_COLUMNS,
+    apply_tracking_edits,
     filter_leads,
+    leads_from_json,
     leads_to_dataframe,
     merge_leads,
     priority_counts,
     tel_link,
+    tracking_editor_df,
     whatsapp_link,
 )
 
@@ -364,16 +374,46 @@ def _render_leads(leads: list[Lead]) -> None:
                                  format_func=lambda s: s.value.replace("_", " ").title())
     prio_opts = c3.multiselect("Priority", list(LeadPriority),
                                format_func=lambda p: p.value.title())
+    hide_contacted = st.checkbox("🙈 Hide already-contacted leads")
+
     filtered = filter_leads(leads, search=search, statuses=set(status_opts) or None,
                             priorities=set(prio_opts) or None)
+    if hide_contacted:
+        filtered = [x for x in filtered if x.crm.contact_status == ContactStatus.NOT_CONTACTED]
     st.caption(f"Showing {len(filtered)} of {len(leads)} leads")
 
-    view = st.radio("View", ["Cards", "Table"], horizontal=True, label_visibility="collapsed")
+    view = st.radio("View", ["Cards", "Track", "Table"], horizontal=True,
+                    label_visibility="collapsed")
     if view == "Cards":
         _render_lead_cards(filtered)
+    elif view == "Track":
+        _render_tracking_editor(leads, filtered)
     else:
         st.dataframe(leads_to_dataframe(filtered, columns=TABLE_COLUMNS),
                      use_container_width=True, hide_index=True)
+
+
+def _render_tracking_editor(all_leads: list[Lead], filtered: list[Lead]) -> None:
+    """Editable CRM: mark status, WhatsApp sent, follow-up date, and notes inline."""
+    st.caption("✏️ Edit status, follow-up date, and notes below — changes are kept as you work. "
+               "Use 💾 Save workspace to keep them permanently.")
+    edited = st.data_editor(
+        tracking_editor_df(filtered),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "key": None,  # hidden
+            "Business": st.column_config.TextColumn("Business", disabled=True),
+            "Phone": st.column_config.TextColumn("Phone", disabled=True),
+            "Priority": st.column_config.TextColumn("Priority", disabled=True),
+            "Status": st.column_config.SelectboxColumn("Status", options=STATUS_LABELS),
+            "WhatsApp Sent": st.column_config.CheckboxColumn("WA Sent"),
+            "Follow-up": st.column_config.DateColumn("Follow-up"),
+            "Notes": st.column_config.TextColumn("Notes", width="large"),
+        },
+        key="tracking_editor",
+    )
+    apply_tracking_edits(all_leads, edited)
 
 
 def _render_downloads(settings: Settings, leads: list[Lead]) -> None:
@@ -387,6 +427,27 @@ def _render_downloads(settings: Settings, leads: list[Lead]) -> None:
                        mime="application/json", use_container_width=True)
     c4.download_button("PDFs.zip", downloads.pdf_zip_bytes(leads, settings.agency),
                        file_name="audits.zip", mime="application/zip", use_container_width=True)
+
+
+def _render_workspace(leads: list[Lead]) -> None:
+    """Save the full working set (leads + tracking) to a file, or restore one."""
+    with st.expander("💾 Save / restore your work"):
+        st.caption("Download your leads + tracking as a file, then re-upload it next time "
+                   "to continue exactly where you left off (survives refresh and reboots).")
+        st.download_button(
+            "💾 Save workspace", downloads.json_bytes(leads),
+            file_name="leadgen-workspace.json", mime="application/json",
+            use_container_width=True,
+        )
+        uploaded = st.file_uploader("Restore a saved workspace", type=["json"])
+        if uploaded is not None and st.button("📂 Load this workspace"):
+            try:
+                st.session_state.leads = leads_from_json(uploaded.getvalue())
+                st.session_state.searched = set()
+                st.success(f"Restored {len(st.session_state.leads)} leads.")
+                st.rerun()
+            except (ValueError, KeyError) as exc:
+                st.error(f"Could not read that file: {exc}")
 
 
 def _render_logs() -> None:
@@ -422,12 +483,14 @@ def main() -> None:
     leads = st.session_state.leads
     if not leads:
         st.info("👈 Pick categories and tap **Generate**, or tap **Sample data** to explore.")
+        _render_workspace(leads)
         _render_logs()
         return
 
     _render_dashboard(leads)
     _render_downloads(settings, leads)
     _render_leads(leads)
+    _render_workspace(leads)
     _render_logs()
 
 

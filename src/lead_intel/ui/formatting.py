@@ -7,14 +7,20 @@ thin rendering layer over these functions.
 
 from __future__ import annotations
 
+import json
 import re
 import urllib.parse
+from datetime import date, datetime
 
 import pandas as pd
 
-from lead_intel.domain.enums import LeadPriority, WebsiteStatus
+from lead_intel.domain.enums import ContactStatus, LeadPriority, WebsiteStatus
 from lead_intel.domain.models import Lead
 from lead_intel.exporters.rows import COLUMNS, lead_to_row
+
+# Human-readable labels for the editable Status column, in workflow order.
+STATUS_LABELS: list[str] = [s.value.replace("_", " ").title() for s in ContactStatus]
+_LABEL_TO_STATUS = {label: status for label, status in zip(STATUS_LABELS, ContactStatus)}
 
 # Compact column set shown in the interactive table (full set is in the export).
 TABLE_COLUMNS: tuple[str, ...] = (
@@ -90,6 +96,62 @@ def priority_counts(leads: list[Lead]) -> dict[str, int]:
         if lead.priority is not None:
             counts[lead.priority.value.title()] += 1
     return counts
+
+
+def _status_label(status: ContactStatus) -> str:
+    return status.value.replace("_", " ").title()
+
+
+def tracking_editor_df(leads: list[Lead]) -> pd.DataFrame:
+    """Build the editable tracking table (one row per lead, keyed by business)."""
+    rows = [
+        {
+            "key": lead.business.dedup_key,
+            "Business": lead.business.name,
+            "Phone": lead.business.contact.phone or "",
+            "Priority": lead.priority.value.title() if lead.priority else "",
+            "Status": _status_label(lead.crm.contact_status),
+            "WhatsApp Sent": lead.crm.whatsapp_sent,
+            "Follow-up": lead.crm.follow_up_date,
+            "Notes": lead.crm.notes,
+        }
+        for lead in leads
+    ]
+    return pd.DataFrame(rows)
+
+
+def apply_tracking_edits(leads: list[Lead], edited: pd.DataFrame) -> None:
+    """Write edits from the tracking table back onto each lead's CRM fields."""
+    by_key = {lead.business.dedup_key: lead for lead in leads}
+    for _, row in edited.iterrows():
+        lead = by_key.get(row["key"])
+        if lead is None:
+            continue
+        lead.crm.contact_status = _LABEL_TO_STATUS.get(
+            row.get("Status", ""), lead.crm.contact_status
+        )
+        lead.crm.whatsapp_sent = bool(row.get("WhatsApp Sent", False))
+        lead.crm.notes = str(row.get("Notes") or "")
+        follow_up = row.get("Follow-up")
+        lead.crm.follow_up_date = _coerce_date(follow_up)
+
+
+def _coerce_date(value: object) -> date | None:
+    # datetime (and pandas Timestamp, a datetime subclass) -> its .date();
+    # plain date passes through; None / NaT / NaN -> None.
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return None
+
+
+def leads_from_json(data: bytes) -> list[Lead]:
+    """Reconstruct leads from a previously-exported JSON workspace."""
+    parsed = json.loads(data)
+    if not isinstance(parsed, list):
+        raise ValueError("Workspace file must be a JSON list of leads.")
+    return [Lead.model_validate(item) for item in parsed]
 
 
 def _e164_digits(phone: str | None, *, default_country: str = "91") -> str | None:
